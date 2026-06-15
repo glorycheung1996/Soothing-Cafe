@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>咖啡廳發財儀表板 - Boss Only</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-[#F4F7F9] font-sans min-h-screen p-6 select-none">
+
+    <div class="max-w-7xl mx-auto flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div>
+            <h1 class="text-2xl font-bold text-[#2A3B47]">📊 咖啡廳發財儀表板</h1>
+            <p class="text-sm text-gray-400 mt-1">即時營運數據與訂單監控</p>
+        </div>
+        <button onclick="fetchDashboardData()" class="bg-[#607E96] text-white px-5 py-2.5 rounded-xl font-semibold shadow-sm hover:bg-[#4E687D] transition flex items-center space-x-2">
+            <span>🔄 重新整理數據</span>
+        </button>
+    </div>
+
+    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36">
+            <span class="text-sm font-semibold text-gray-400">💰 累積總營業額</span>
+            <span id="stat-revenue" class="text-4xl font-extrabold text-[#607E96]">$0</span>
+            <span class="text-xs text-green-500 font-medium">↑ 即時同步中</span>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36">
+            <span class="text-sm font-semibold text-gray-400">📦 總接單數量</span>
+            <span id="stat-orders" class="text-4xl font-extrabold text-[#2A3B47]">0 筆</span>
+            <span class="text-xs text-gray-400">包含所有外場 iPad 提交</span>
+        </div>
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between h-36">
+            <span class="text-sm font-semibold text-gray-400">☕ 平均客單價</span>
+            <span id="stat-avg" class="text-4xl font-extrabold text-amber-600">$0</span>
+            <span class="text-xs text-gray-400">每筆訂單平均消費</span>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-1">
+            <h3 class="text-lg font-bold text-[#2A3B47] mb-4">🏆 商品銷售排行</h3>
+            <div id="ranking-list" class="space-y-3">
+                </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
+            <h3 class="text-lg font-bold text-[#2A3B47] mb-4">📜 即時訂單流水帳 (最新在前)</h3>
+            <div id="order-log" class="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 🔒 已自動填入你的專屬雲端金鑰
+        const SUPABASE_URL = "https://vmrfvymxetydckgzoham.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtcmZ2eW14ZXR5ZGNrZ3pvaGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MjA3MjIsImV4cCI6MjA5Njk5NjcyMn0.IWCBSsTcdPwaQhHJY1TludpLtnTzO774z4JgMdmveCE";
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 從雲端撈取所有訂單，並用前端 JavaScript 即時統計
+        async function fetchDashboardData() {
+            try {
+                // 從 orders 資料表抓取所有資料，並依照時間由新到舊排序
+                const { data: orders, error } = await supabaseClient
+                    .from('orders')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                // 1. 初始化統計變數
+                let totalRevenue = 0;
+                let totalOrders = orders.length;
+                let itemSales = {}; // 用來統計各品項賣出數量的物件
+
+                // 2. 開始計算數據
+                orders.forEach(order => {
+                    totalRevenue += order.total_price;
+                    
+                    // 解開 JSONB 格式的品項明細
+                    order.items.forEach(item => {
+                        // 以「品項名稱」作為排行榜統計基準
+                        if (itemSales[item.name]) {
+                            itemSales[item.name] += item.quantity;
+                        } else {
+                            itemSales[item.name] = item.quantity;
+                        }
+                    });
+                });
+
+                // 3. 更新頂部卡片 UI
+                document.getElementById('stat-revenue').innerText = `$${totalRevenue.toLocaleString()}`;
+                document.getElementById('stat-orders').innerText = `${totalOrders} 筆`;
+                
+                const avgPrice = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+                document.getElementById('stat-avg').innerText = `$${avgPrice}`;
+
+                // 4. 渲染商品排行榜 UI
+                const rankingContainer = document.getElementById('ranking-list');
+                // 將物件轉換成陣列並排序
+                const sortedItems = Object.entries(itemSales).sort((a, b) => b[1] - a[1]);
+                
+                if (sortedItems.length === 0) {
+                    rankingContainer.innerHTML = `<p class="text-gray-400 text-sm text-center py-4">暫無銷售數據</p>`;
+                } else {
+                    rankingContainer.innerHTML = sortedItems.map(([name, qty], index) => {
+                        let medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🔹";
+                        return `
+                            <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                                <span class="font-medium text-[#2A3B47] text-sm">${medal} ${name}</span>
+                                <span class="bg-[#607E96]/10 text-[#607E96] font-bold px-3 py-1 rounded-full text-xs">${qty} 杯/個</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // 5. 渲染歷史訂單流水帳 UI
+                const logContainer = document.getElementById('order-log');
+                if (orders.length === 0) {
+                    logContainer.innerHTML = `<p class="text-gray-400 text-sm text-center py-8">目前還沒有任何訂單喔！</p>`;
+                } else {
+                    logContainer.innerHTML = orders.map(order => {
+                        // 格式化資料庫時間
+                        const localTime = new Date(order.created_at).toLocaleString('zh-TW', {
+                            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        });
+
+                        // 組合該訂單內的商品文字明細
+                        const itemsHtml = order.items.map(item => `
+                            <div class="text-sm text-gray-600 flex justify-between py-0.5">
+                                <span>• ${item.name} ${item.ice || item.sugar ? `<span class="text-xs text-gray-400">(${item.ice}/${item.sugar})</span>` : ''}</span>
+                                <span class="text-gray-400">x${item.quantity}</span>
+                            </div>
+                        `).join('');
+
+                        return `
+                            <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col md:flex-row justify-between md:items-center gap-2">
+                                <div class="flex-1">
+                                    <div class="flex items-center space-x-2 mb-2">
+                                        <span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-mono">#${order.id}</span>
+                                        <span class="text-xs text-gray-400">${localTime}</span>
+                                    </div>
+                                    <div class="space-y-1">
+                                        ${itemsHtml}
+                                    </div>
+                                </div>
+                                <div class="text-right border-t md:border-t-0 pt-2 md:pt-0 border-gray-200">
+                                    <span class="text-xs text-gray-400 block">訂單總額</span>
+                                    <span class="text-xl font-bold text-[#607E96]">$${order.total_price}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("撈取數據失敗：" + err.message);
+            }
+        }
+
+        // 網頁一打開就自動讀取一次
+        fetchDashboardData();
+    </script>
+</body>
+</html>
