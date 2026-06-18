@@ -3,47 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>店長專用 - 雲端菜單管理後台</title>
+    <title>店長專用 - 菜單與加購設定</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="bg-[#F4F7F9] font-sans min-h-screen p-6">
-
     <div class="max-w-6xl mx-auto">
-        <div class="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div>
-                <h1 class="text-2xl font-bold text-[#2A3B47]">🛠️ 店長專用：雲端菜單管理後台</h1>
-                <p class="text-sm text-gray-400 mt-1">即時修改商品、調整價格、設定分類與售完狀態</p>
-            </div>
-            <a href="dashboard.html" class="text-sm bg-gray-100 text-gray-600 px-4 py-2 rounded-xl font-medium hover:bg-gray-200">📊 前往發財儀表板</a>
-        </div>
-
+        <h1 class="text-2xl font-bold text-[#2A3B47] mb-6">🛠️ 菜單與加購管理</h1>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
-                <h3 class="text-lg font-bold text-[#2A3B47] mb-4">➕ 新增商品</h3>
+                <h3 class="font-bold mb-4">➕ 新增商品</h3>
                 <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-500 mb-1">商品名稱</label>
-                        <input id="new-name" type="text" placeholder="例如：拿鐵咖啡" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-[#607E96]">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-500 mb-1">價格</label>
-                        <input id="new-price" type="number" placeholder="例如：120" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-[#607E96]">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-500 mb-1">商品分類 (自由輸入)</label>
-                        <input id="new-category" type="text" placeholder="例如：咖啡飲品" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-[#607E96]">
-                    </div>
-                    <button onclick="addProduct()" class="w-full bg-[#607E96] text-white py-3 rounded-xl font-bold hover:bg-[#4E687D] transition shadow-md">
-                        🚀 儲存至雲端
-                    </button>
+                    <input id="new-name" placeholder="商品名稱" class="w-full px-4 py-2 border rounded-xl">
+                    <input id="new-price" type="number" placeholder="價格" class="w-full px-4 py-2 border rounded-xl">
+                    <input id="new-category" placeholder="商品分類" class="w-full px-4 py-2 border rounded-xl">
+                    <input id="new-addon" placeholder="加購分類名稱 (選填)" class="w-full px-4 py-2 border rounded-xl bg-gray-50">
+                    <button onclick="addProduct()" class="w-full bg-[#607E96] text-white py-3 rounded-xl font-bold hover:bg-[#4E687D]">儲存至雲端</button>
                 </div>
             </div>
-
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
-                <table class="w-full text-left">
-                    <tbody id="product-table-body" class="divide-y divide-gray-50">
-                        </tbody>
+                <table class="w-full text-left text-sm">
+                    <thead><tr class="text-gray-400 border-b"><th>名稱</th><th>價格</th><th>分類</th><th>加購分類</th><th>操作</th></tr></thead>
+                    <tbody id="product-table-body"></tbody>
                 </table>
             </div>
         </div>
@@ -56,43 +37,37 @@
 
         async function fetchProducts() {
             const { data } = await supabaseClient.from('products').select('*').order('id', { ascending: true });
-            const tbody = document.getElementById('product-table-body');
-            tbody.innerHTML = data.map(p => `
-                <tr class="text-gray-700">
-                    <td class="py-3"><input id="name-${p.id}" value="${p.name}" class="w-full px-1 border-b focus:border-[#607E96]"></td>
-                    <td class="py-3"><input id="price-${p.id}" value="${p.price}" class="w-16 px-1 border-b focus:border-[#607E96]"></td>
-                    <td class="py-3"><input id="cat-${p.id}" value="${p.category}" class="w-24 px-1 border-b focus:border-[#607E96]"></td>
-                    <td class="py-3 text-center">
-                        <input id="sold-${p.id}" type="checkbox" ${p.is_sold_out?'checked':''}>
-                    </td>
-                    <td class="py-3 text-center">
-                        <button onclick="updateProduct(${p.id})" class="text-xs bg-[#607E96]/10 text-[#607E96] font-bold px-3 py-1 rounded-lg">儲存</button>
-                    </td>
+            document.getElementById('product-table-body').innerHTML = data.map(p => `
+                <tr class="border-b">
+                    <td class="py-3"><input id="name-${p.id}" value="${p.name}" class="w-full border-b"></td>
+                    <td class="py-3"><input id="price-${p.id}" value="${p.price}" class="w-12 border-b"></td>
+                    <td class="py-3"><input id="cat-${p.id}" value="${p.category}" class="w-20 border-b"></td>
+                    <td class="py-3"><input id="addon-${p.id}" value="${p.add_on_type || ''}" class="w-20 border-b bg-gray-50"></td>
+                    <td class="py-3"><button onclick="updateProduct(${p.id})" class="text-[#607E96] font-bold">儲存</button></td>
                 </tr>
             `).join('');
         }
 
         async function addProduct() {
-            const name = document.getElementById('new-name').value;
-            const price = document.getElementById('new-price').value;
-            const category = document.getElementById('new-category').value || '其他';
-            
-            await supabaseClient.from('products').insert([{ name, price, category }]);
-            alert("新增成功！");
+            await supabaseClient.from('products').insert([{ 
+                name: document.getElementById('new-name').value,
+                price: document.getElementById('new-price').value,
+                category: document.getElementById('new-category').value,
+                add_on_type: document.getElementById('new-addon').value || null
+            }]);
             fetchProducts();
         }
 
         async function updateProduct(id) {
-            const name = document.getElementById(`name-${id}`).value;
-            const price = document.getElementById(`price-${id}`).value;
-            const category = document.getElementById(`cat-${id}`).value;
-            const is_sold_out = document.getElementById(`sold-${id}`).checked;
-
-            await supabaseClient.from('products').update({ name, price, category, is_sold_out }).eq('id', id);
-            alert("已儲存！");
+            await supabaseClient.from('products').update({ 
+                name: document.getElementById(`name-${id}`).value,
+                price: document.getElementById(`price-${id}`).value,
+                category: document.getElementById(`cat-${id}`).value,
+                add_on_type: document.getElementById(`addon-${id}`).value || null
+            }).eq('id', id);
+            alert("已更新！");
             fetchProducts();
         }
-
         fetchProducts();
     </script>
 </body>
