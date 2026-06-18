@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>店長專用 - 雲端菜單管理後台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-[#F4F7F9] font-sans min-h-screen p-6">
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div>
+                <h1 class="text-2xl font-bold text-[#2A3B47]">🛠️ 店長專用：雲端菜單管理後台</h1>
+                <p class="text-sm text-gray-400 mt-1">即時修改商品、調整價格、設定套餐與售完狀態</p>
+            </div>
+            <a href="dashboard.html" class="text-sm bg-gray-100 text-gray-600 px-4 py-2 rounded-xl font-medium hover:bg-gray-200">📊 前往發財儀表板</a>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-fit">
+                <h3 class="text-lg font-bold text-[#2A3B47] mb-4">➕ 新增商品或套餐設定</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-500 mb-1">商品/套餐名稱</label>
+                        <input id="new-name" type="text" placeholder="例如：夏日狂歡雙人套餐" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-[#607E96]">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-500 mb-1">價格 (元)</label>
+                        <input id="new-price" type="number" placeholder="例如：250" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-[#607E96]">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-500 mb-1">商品分類</label>
+                        <select id="new-category" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:border-[#607E96] bg-white">
+                            <option value="咖啡飲品">咖啡飲品</option>
+                            <option value="精緻甜點">精緻甜點</option>
+                            <option value="精選套餐">精選套餐</option>
+                            <option value="其他單品">其他單品</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-6 py-2">
+                        <label class="flex items-center space-x-2 text-sm text-gray-600 cursor-pointer">
+                            <input id="new-custom" type="checkbox" checked class="w-4 h-4 rounded border-gray-300 text-[#607E96] focus:ring-[#607E96]">
+                            <span>需要客製化 (冰量/甜度)</span>
+                        </label>
+                    </div>
+                    <button onclick="addProduct()" class="w-full bg-[#607E96] text-white py-3 rounded-xl font-bold hover:bg-[#4E687D] transition shadow-md">
+                        🚀 儲存並同步至雲端菜單
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2">
+                <h3 class="text-lg font-bold text-[#2A3B47] mb-4">📝 目前雲端菜單清單 (修改後請按儲存)</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-100 text-gray-400 text-sm">
+                                <th class="pb-3 font-semibold">商品名稱</th>
+                                <th class="pb-3 font-semibold w-24">價格</th>
+                                <th class="pb-3 font-semibold w-32">分類</th>
+                                <th class="pb-3 font-semibold text-center w-20">客製化</th>
+                                <th class="pb-3 font-semibold text-center w-20">售完</th>
+                                <th class="pb-3 font-semibold text-center w-24">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="product-table-body" class="divide-y divide-gray-50">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://vmrfvymxetydckgzoham.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtcmZ2eW14ZXR5ZGNrZ3pvaGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MjA3MjIsImV4cCI6MjA5Njk5NjcyMn0.IWCBSsTcdPwaQhHJY1TludpLtnTzO774z4JgMdmveCE";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 讀取並渲染商品列表
+        async function fetchProducts() {
+            try {
+                const { data: products, error } = await supabaseClient
+                    .from('products')
+                    .select('*')
+                    .order('id', { ascending: true });
+
+                if (error) throw error;
+
+                const tbody = document.getElementById('product-table-body');
+                tbody.innerHTML = products.map(p => `
+                    <tr class="text-gray-700 hover:bg-gray-50/50">
+                        <td class="py-3.5 pr-2">
+                            <input id="name-${p.id}" type="text" value="${p.name}" class="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#607E96] focus:bg-white px-1 py-0.5 rounded w-full font-medium text-[#2A3B47]">
+                        </td>
+                        <td class="py-3.5">
+                            <div class="flex items-center">
+                                <span class="text-gray-400 mr-0.5">$</span>
+                                <input id="price-${p.id}" type="number" value="${p.price}" class="w-16 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#607E96] focus:bg-white px-1 py-0.5 rounded text-right font-semibold text-[#607E96]">
+                            </div>
+                        </td>
+                        <td class="py-3.5">
+                            <select id="cat-${p.id}" class="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#607E96] focus:bg-white py-0.5 rounded text-sm text-gray-600">
+                                <option value="咖啡飲品" ${p.category==='咖啡飲品'?'selected':''}>咖啡飲品</option>
+                                <option value="精緻甜點" ${p.category==='精緻甜點'?'selected':''}>精緻甜點</option>
+                                <option value="精選套餐" ${p.category==='精選套餐'?'selected':''}>精選套餐</option>
+                                <option value="其他單品" ${p.category==='其他單品'?'selected':''}>其他單品</option>
+                            </select>
+                        </td>
+                        <td class="py-3.5 text-center">
+                            <input id="custom-${p.id}" type="checkbox" ${p.has_custom?'checked':''} class="w-4 h-4 text-[#607E96] rounded border-gray-300 focus:ring-[#607E96]">
+                        </td>
+                        <td class="py-3.5 text-center">
+                            <input id="sold-${p.id}" type="checkbox" ${p.is_sold_out?'checked':''} class="w-4 h-4 text-red-500 rounded border-gray-300 focus:ring-red-500">
+                        </td>
+                        <td class="py-3.5 text-center">
+                            <button onclick="updateProduct(${p.id})" class="text-xs bg-[#607E96]/10 text-[#607E96] font-bold px-3 py-1 rounded-lg hover:bg-[#607E96] hover:text-white transition">
+                                💾 儲存
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) {
+                alert("撈取菜單清單失敗：" + err.message);
+            }
+        }
+
+        // 🚀 新增商品 / 套餐
+        async function addProduct() {
+            const name = document.getElementById('new-name').value.trim();
+            const price = parseFloat(document.getElementById('new-price').value);
+            const category = document.getElementById('new-category').value;
+            const has_custom = document.getElementById('new-custom').checked;
+
+            if (!name || isNaN(price)) return alert("請完整填寫商品名稱與價格！");
+
+            try {
+                const { error } = await supabaseClient
+                    .from('products')
+                    .insert([{ name, price, category, has_custom, is_sold_out: false }]);
+
+                if (error) throw error;
+                alert(`🎉 成功新增商品：${name}！`);
+                
+                // 清空輸入框
+                document.getElementById('new-name').value = '';
+                document.getElementById('new-price').value = '';
+                fetchProducts();
+            } catch (err) {
+                alert("新增商品失敗：" + err.message);
+            }
+        }
+
+        // 💾 修改並更新單一商品
+        async function updateProduct(id) {
+            const name = document.getElementById(`name-${id}`).value.trim();
+            const price = parseFloat(document.getElementById(`price-${id}`).value);
+            const category = document.getElementById(`cat-${id}`).value;
+            const has_custom = document.getElementById(`custom-${id}`).checked;
+            const is_sold_out = document.getElementById(`sold-${id}`).checked;
+
+            if (!name || isNaN(price)) return alert("名稱與價格不可為空！");
+
+            try {
+                const { error } = await supabaseClient
+                    .from('products')
+                    .update({ name, price, category, has_custom, is_sold_out })
+                    .eq('id', id);
+
+                if (error) throw error;
+                alert("💪 雲端菜單已成功同步修改！");
+                fetchProducts();
+            } catch (err) {
+                alert("更新失敗：" + err.message);
+            }
+        }
+
+        // 初始載入
+        fetchProducts();
+    </script>
+</body>
+</html>
