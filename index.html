@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scandinavian Cafe POS - Dynamic Cloud</title>
+    <title>Scandinavian Cafe POS - Advanced Combo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -11,12 +11,11 @@
 
     <div class="w-7/10 p-6 overflow-y-auto h-full flex flex-col">
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-2xl font-bold text-[#2A3B47]">☕ 雲端動態點餐系統</h2>
+            <h2 class="text-2xl font-bold text-[#2A3B47]">☕ 雲端動態點餐系統 (支援套餐加購)</h2>
             <button onclick="loadMenuFromCloud()" class="text-xs bg-white text-gray-500 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">🔄 重新整理菜單</button>
         </div>
         
-        <div id="category-tabs" class="flex space-x-2 mb-6 overflow-x-auto pb-2">
-            </div>
+        <div id="category-tabs" class="flex space-x-2 mb-6 overflow-x-auto pb-2"></div>
         
         <div id="menu-grid" class="grid grid-cols-3 gap-4">
             <div class="col-span-3 text-center py-12 text-gray-400">正在從雲端下載最新菜單...</div>
@@ -40,28 +39,17 @@
         </div>
     </div>
 
-    <div id="custom-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
-        <div class="bg-white rounded-3xl p-6 w-[500px] shadow-2xl max-w-full mx-4">
-            <h3 id="modal-title" class="text-2xl font-bold text-[#2A3B47] mb-6">客製化選項</h3>
-            <div class="mb-6">
-                <p class="text-sm font-semibold text-gray-400 mb-2">冰塊 (Ice)</p>
-                <div class="grid grid-cols-3 gap-2">
-                    <button onclick="selectOption('ice', '正常冰')" id="ice-正常冰" class="opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]">正常冰</button>
-                    <button onclick="selectOption('ice', '少冰')" id="ice-少冰" class="opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]">少冰</button>
-                    <button onclick="selectOption('ice', '去冰')" id="ice-去冰" class="opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]">去冰</button>
+    <div id="addon-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-3xl p-6 w-[550px] shadow-2xl max-w-full mx-4">
+            <h3 id="addon-modal-title" class="text-2xl font-bold text-[#2A3B47] mb-2">套餐升級加購</h3>
+            <p id="addon-modal-subtitle" class="text-sm text-gray-400 mb-6">請選擇搭配的加購商品：</p>
+            
+            <div id="addon-list" class="space-y-3 max-h-[300px] overflow-y-auto mb-6 pr-1">
                 </div>
-            </div>
-            <div class="mb-8">
-                <p class="text-sm font-semibold text-gray-400 mb-2">甜度 (Sugar)</p>
-                <div class="grid grid-cols-3 gap-2">
-                    <button onclick="selectOption('sugar', '正常糖')" id="sugar-正常糖" class="opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]">正常糖</button>
-                    <button onclick="selectOption('sugar', '微糖')" id="sugar-微糖" class="opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]">微糖</button>
-                    <button onclick="selectOption('sugar', '無糖')" id="sugar-無糖" class="opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]">無糖</button>
-                </div>
-            </div>
+
             <div class="flex space-x-3">
-                <button onclick="closeModal()" class="w-1/2 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-200">取消</button>
-                <button onclick="confirmCustomization()" class="w-1/2 bg-[#607E96] text-white py-3 rounded-xl font-bold hover:bg-[#4E687D]">加入購物車</button>
+                <button onclick="closeAddonModal()" class="w-1/2 bg-gray-100 text-gray-600 py-3 rounded-xl font-bold hover:bg-gray-200">取消</button>
+                <button onclick="confirmAddonSelection()" class="w-1/2 bg-[#607E96] text-white py-3 rounded-xl font-bold hover:bg-[#4E687D]">確認組合並加入</button>
             </div>
         </div>
     </div>
@@ -71,133 +59,136 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtcmZ2eW14ZXR5ZGNrZ3pvaGFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MjA3MjIsImV4cCI6MjA5Njk5NjcyMn0.IWCBSsTcdPwaQhHJY1TludpLtnTzO774z4JgMdmveCE";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let menuProducts = []; // 改為從雲端動態下載存入
+        let menuProducts = []; 
         let currentCategory = '全部商品';
         let cart = [];
-        let currentProduct = null;
-        let selectedIce = '正常冰';
-        let selectedSugar = '正常糖';
+        
+        // 加購暫存變數
+        let currentMainProduct = null;
+        let selectedAddonProduct = null;
 
-        // 🚀 從雲端撈取最新菜單
         async function loadMenuFromCloud() {
             try {
-                const { data, error } = await supabaseClient
-                    .from('products')
-                    .select('*')
-                    .order('id', { ascending: true });
+                const { data, error } = await supabaseClient.from('products').select('*').order('id', { ascending: true });
                 if (error) throw error;
                 menuProducts = data;
                 renderCategoryTabs();
                 renderMenu();
             } catch (err) {
-                console.error(err);
                 alert("下載菜單失敗：" + err.message);
             }
         }
 
         function renderCategoryTabs() {
             const tabsContainer = document.getElementById('category-tabs');
-            // 找出所有不重複的分類
-            const categories = ['全部商品', ...new Set(menuProducts.map(p => p.category))];
-            
-            tabsContainer.innerHTML = categories.map(cat => {
-                const isSelected = cat === currentCategory;
-                return `
-                    <button onclick="switchCategory('${cat}')" class="px-5 py-2 rounded-xl font-semibold whitespace-nowrap transition-all ${
-                        isSelected ? 'bg-[#607E96] text-white shadow-sm' : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-100'
-                    }">
-                        ${cat}
-                    </button>
-                `;
-            }).join('');
+            const categories = ['全部商品', ...new Set(menuProducts.map(p => p.category).filter(Boolean))];
+            tabsContainer.innerHTML = categories.map(cat => `
+                <button onclick="switchCategory('${cat}')" class="px-5 py-2 rounded-xl font-semibold whitespace-nowrap transition-all ${
+                    cat === currentCategory ? 'bg-[#607E96] text-white shadow-sm' : 'bg-white text-gray-500 border border-gray-100'
+                }">${cat}</button>
+            `).join('');
         }
 
-        function switchCategory(cat) {
-            currentCategory = cat;
-            renderCategoryTabs();
-            renderMenu();
-        }
+        function switchCategory(cat) { currentCategory = cat; renderCategoryTabs(); renderMenu(); }
 
         function renderMenu() {
             const menuGrid = document.getElementById('menu-grid');
-            // 過濾分類
-            const filtered = currentCategory === '全部商品' ? 
-                menuProducts : menuProducts.filter(p => p.category === currentCategory);
+            const filtered = currentCategory === '全部商品' ? menuProducts : menuProducts.filter(p => p.category === currentCategory);
 
             if (filtered.length === 0) {
-                menuGrid.innerHTML = `<div class="col-span-3 text-center py-12 text-gray-400">此分類目前沒有商品</div>`;
+                menuGrid.innerHTML = `<div class="col-span-3 text-center py-12 text-gray-400">目前沒有商品</div>`;
                 return;
             }
 
-            menuGrid.innerHTML = filtered.map(product => {
-                if (product.is_sold_out) {
-                    // 售完樣式：變灰、加上 SOLD OUT 標籤、禁用點擊
-                    return `
-                        <button disabled class="bg-gray-200/70 p-6 rounded-2xl text-left flex flex-col justify-between h-36 border border-gray-300 relative overflow-hidden cursor-not-allowed">
-                            <span class="text-lg font-bold text-gray-400">${product.name}</span>
-                            <div class="flex justify-between items-center w-full mt-auto">
-                                <span class="text-xs bg-red-500 text-white font-bold px-2 py-0.5 rounded">已售完 SOLD OUT</span>
-                                <span class="text-gray-400 font-semibold text-xl">$${product.price}</span>
-                            </div>
-                        </button>
-                    `;
-                } else {
-                    // 正常樣式
-                    return `
-                        <button onclick="handleProductClick(${product.id})" class="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md hover:border-[#607E96] transition-all text-left flex flex-col justify-between h-36 border border-transparent">
-                            <span class="text-lg font-bold text-[#2A3B47]">${product.name}</span>
-                            <span class="text-[#607E96] font-semibold text-xl text-right w-full">$${product.price}</span>
-                        </button>
-                    `;
-                }
-            }).join('');
+            menuGrid.innerHTML = filtered.map(product => `
+                <button onclick="handleProductClick(${product.id})" class="bg-white p-6 rounded-2xl shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between h-36 relative">
+                    <span class="text-lg font-bold text-[#2A3B47]">${product.name}</span>
+                    <div class="flex justify-between items-center w-full">
+                        ${product.add_on_type ? `<span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md font-bold">🍱 有加購選項</span>` : '<span></span>'}
+                        <span class="text-[#607E96] font-semibold text-xl">$${product.price}</span>
+                    </div>
+                </button>
+            `).join('');
         }
 
+        // 🧠 核心邏輯判斷：點擊商品後該怎麼做？
         function handleProductClick(productId) {
             const product = menuProducts.find(p => p.id === productId);
-            if (product.has_custom) {
-                currentProduct = product;
-                document.getElementById('modal-title').innerText = `客製化：${product.name}`;
-                document.getElementById('custom-modal').classList.remove('hidden');
-                selectOption('ice', '正常冰');
-                selectOption('sugar', '正常糖');
+            
+            // 如果這隻商品有填寫「加購對應分類」
+            if (product.add_on_type) {
+                currentMainProduct = product;
+                selectedAddonProduct = null; // 重置選擇
+                openAddonModal(product.add_on_type);
             } else {
-                addToCart(product, '', '');
+                // 一般商品，直接進購物車
+                addToCart(product, null);
             }
         }
 
-        function selectOption(type, value) {
-            if (type === 'ice') {
-                selectedIce = value;
-                ['正常冰', '少冰', '去冰'].forEach(v => {
-                    document.getElementById(`ice-${v}`).className = v === value ? 
-                        "opt-btn border-2 border-[#607E96] bg-[#F0F4F8] py-3 rounded-xl font-bold text-[#607E96]" : 
-                        "opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]";
-                });
+        // 🍱 打開加購視窗並自動篩選對應商品
+        function openAddonModal(addonCategory) {
+            document.getElementById('addon-modal-title').innerText = `🎁 套餐升級：${currentMainProduct.name}`;
+            document.getElementById('addon-modal-subtitle').innerText = `請選擇搭配的一款【${addonCategory}】商品：`;
+            
+            // 從現有的雲端菜單清單中，找出符合該加購分類的所有單品
+            const availableAddons = menuProducts.filter(p => p.category === addonCategory);
+            const listContainer = document.getElementById('addon-list');
+
+            if (availableAddons.length === 0) {
+                listContainer.innerHTML = `<p class="text-sm text-gray-400 text-center py-4">雲端找不到分類為「${addonCategory}」的加購品項，請店長至後台新增。</p>`;
             } else {
-                selectedSugar = value;
-                ['正常糖', '微糖', '無糖'].forEach(v => {
-                    document.getElementById(`sugar-${v}`).className = v === value ? 
-                        "opt-btn border-2 border-[#607E96] bg-[#F0F4F8] py-3 rounded-xl font-bold text-[#607E96]" : 
-                        "opt-btn border border-[#E2E8F0] py-3 rounded-xl font-medium text-[#2A3B47]";
-                });
+                listContainer.innerHTML = availableAddons.map(addon => `
+                    <button onclick="selectAddonItem(${addon.id})" id="addon-item-${addon.id}" class="w-full bg-gray-50 border border-gray-200 p-4 rounded-xl flex justify-between items-center text-left transition-all hover:bg-gray-100/50">
+                        <div>
+                            <p class="font-bold text-[#2A3B47]">${addon.name}</p>
+                            <p class="text-xs text-gray-400">套餐組合單品</p>
+                        </div>
+                        <span class="font-bold text-[#607E96]">$${addon.price}</span>
+                    </button>
+                `).join('');
             }
+            document.getElementById('addon-modal').classList.remove('hidden');
         }
 
-        function confirmCustomization() {
-            addToCart(currentProduct, selectedIce, selectedSugar);
-            closeModal();
+        // 點選視窗內的某一隻加購品
+        function selectAddonItem(addonId) {
+            selectedAddonProduct = menuProducts.find(p => p.id === addonId);
+            
+            // 把所有加購按鈕恢復原狀，只高亮被選中的那一顆
+            const buttons = document.getElementById('addon-list').getElementsByTagName('button');
+            for (let btn of buttons) {
+                btn.className = "w-full bg-gray-50 border border-gray-200 p-4 rounded-xl flex justify-between items-center text-left transition-all hover:bg-gray-100/50";
+            }
+            document.getElementById(`addon-item-${addonId}`).className = "w-full border-2 border-amber-500 bg-amber-50/50 p-4 rounded-xl flex justify-between items-center text-left transition-all";
         }
 
-        function closeModal() { document.getElementById('custom-modal').classList.add('hidden'); }
+        function closeAddonModal() { document.getElementById('addon-modal').classList.add('hidden'); }
 
-        function addToCart(product, ice, sugar) {
-            const cartKey = `${product.id}-${ice}-${sugar}`;
+        // 按下「確認組合並加入」
+        function confirmAddonSelection() {
+            if (!selectedAddonProduct) return alert("請先選擇一個加購品項喔！");
+            addToCart(currentMainProduct, selectedAddonProduct);
+            closeAddonModal();
+        }
+
+        // 🛒 購物車核心：支援單品與加購套餐組合
+        function addToCart(mainProduct, addonProduct) {
+            // 用來區分購物車品項的唯一 Key
+            const cartKey = addonProduct ? `combo-${mainProduct.id}-${addonProduct.id}` : `single-${mainProduct.id}`;
             const existItem = cart.find(item => item.key === cartKey);
+
             if (existItem) {
                 existItem.quantity += 1;
             } else {
-                cart.push({ ...product, key: cartKey, quantity: 1, ice: ice, sugar: sugar });
+                cart.push({
+                    key: cartKey,
+                    id: mainProduct.id,
+                    name: mainProduct.name,
+                    price: mainProduct.price,
+                    quantity: 1,
+                    addon: addonProduct ? { id: addonProduct.id, name: addonProduct.name, price: addonProduct.price } : null
+                });
             }
             updateCartUI();
         }
@@ -205,53 +196,70 @@
         function updateCartUI() {
             const cartContainer = document.getElementById('cart-items');
             const totalContainer = document.getElementById('total-price');
+            
             if (cart.length === 0) {
                 cartContainer.innerHTML = `<div class="text-gray-400 text-center py-8 text-sm">尚未選擇商品</div>`;
                 totalContainer.innerText = "$0";
                 return;
             }
-            cartContainer.innerHTML = cart.map(item => `
-                <div class="flex justify-between items-center text-sm bg-white p-3 rounded-xl shadow-sm border border-[#F0F4F8]">
-                    <div>
-                        <p class="font-bold text-[#2A3B47]">${item.name}</p>
-                        ${item.has_custom ? `<p class="text-xs text-[#607E96] font-medium">${item.ice} / ${item.sugar}</p>` : ''}
-                        <p class="text-xs text-gray-400">數量: ${item.quantity}</p>
+
+            let total = 0;
+            cartContainer.innerHTML = cart.map(item => {
+                // 計算單個品項組合的金額（主食 + 加購價）
+                const itemTotalPrice = (item.price + (item.addon ? item.addon.price : 0)) * item.quantity;
+                total += itemTotalPrice;
+
+                return `
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-[#F0F4F8]">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-bold text-[#2A3B47] text-base">${item.name}</p>
+                                ${item.addon ? `<p class="text-xs text-amber-600 font-medium mt-1">➕ 加購：${item.addon.name} (+$${item.addon.price})</p>` : ''}
+                                <p class="text-xs text-gray-400 mt-2">數量: ${item.quantity}</p>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <span class="font-bold text-gray-700">$${itemTotalPrice}</span>
+                                <button onclick="removeFromCart('${item.key}')" class="text-gray-300 hover:text-red-500 font-bold px-1">✕</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex items-center space-x-3">
-                        <span class="font-semibold text-gray-700">$${item.price * item.quantity}</span>
-                        <button onclick="removeFromCart('${item.key}')" class="text-gray-300 hover:text-red-500 font-bold px-1">✕</button>
-                    </div>
-                </div>
-            `).join('');
-            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                `;
+            }).join('');
+            
             totalContainer.innerText = `$${total}`;
         }
 
-        function removeFromCart(cartKey) {
-            cart = cart.filter(item => item.key !== cartKey);
-            updateCartUI();
-        }
-
+        function removeFromCart(cartKey) { cart = cart.filter(item => item.key !== cartKey); updateCartUI(); }
         function clearCart() { cart = []; updateCartUI(); }
 
+        // 📤 結帳並同步至雲端
         async function checkout() {
             if (cart.length === 0) return alert("購物車是空的喔！");
-            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            const orderItems = cart.map(item => ({
-                name: item.name, price: item.price, quantity: item.quantity, ice: item.ice, sugar: item.sugar
-            }));
+            
+            let total = 0;
+            const orderItems = cart.map(item => {
+                const price = item.price + (item.addon ? item.addon.price : 0);
+                total += price * item.quantity;
+                
+                return {
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    // 如果有加購，一起打包進 items JSON 欄位中
+                    addon_item: item.addon ? { name: item.addon.name, price: item.addon.price } : null
+                };
+            });
 
             try {
                 const { error } = await supabaseClient.from('orders').insert([{ total_price: total, items: orderItems }]);
                 if (error) throw error;
-                alert("🎉 訂單成功上傳到 Supabase 雲端資料庫了！");
+                alert("🎉 訂單成功送出，已完美同步雲端！");
                 clearCart();
             } catch (err) {
                 alert("上傳失敗：" + err.message);
             }
         }
 
-        // 初始載入
         loadMenuFromCloud();
     </script>
 </body>
